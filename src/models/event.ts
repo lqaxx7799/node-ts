@@ -1,5 +1,6 @@
 import Mongoose from 'mongoose';
 import _ from 'lodash';
+import Conversation from './conversation';
 
 const DEFAULT_TIMEZONE = 'Asia/Ho_Chi_Minh';
 const periodFormats = {
@@ -56,7 +57,7 @@ interface IEventDoc extends IEvent, Mongoose.Document {}
 
 const Event = Mongoose.model<IEventDoc>('event', eventSchema);
 
-const addBatch = async (data: Array<IEvent>): Promise<boolean> => {
+const addBatch = async (data: IEvent[]): Promise<boolean> => {
   try {
     const res = await Promise.all(data.map((item) => Event.create(item)));
     return true;
@@ -324,13 +325,42 @@ const getReport = async (
     breached: _(byConversation).filter(item => !item.hit).size(),
   };
 
+  const conversationIds = _(byConversation)
+    .map(item => item._id.conversationId)
+    .uniq()
+    .value();
+
+  const conversations = Conversation.getByIds(conversationIds);
+  const byAgent: any = {};
+  _.forEach(byConversation, item => {
+    const conversation = _.find(conversations, conv => conv._id === item._id.conversationId);
+    if (!conversation) {
+      return;
+    }
+    byAgent[conversation.assignedTo] = {
+      rate: '',
+      total: '',
+      breached: '',
+    };
+  })
+
+  const agents: any[] = [];
+  _.map(agents, agent => {
+    return {
+      agentId: agent._id,
+
+    }
+  })
+
   return {
     general,
+    // generalPast,
     // byTime,
     byCompliance,
     byDayOfWeek,
     // byAgent,
     byPerformance,
+    // byPerformancePast,
   };
 };
 

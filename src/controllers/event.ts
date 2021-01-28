@@ -11,7 +11,7 @@ const getReport = (request: Request, response: Response) => {
 }
 
 const insertTestData = (request: Request, response: Response) => {
-  const testData: Array<IEvent> = [
+  const testData: IEvent[] = [
     {
       "name" : "SLA_COMPLIED",
       "data" : {
