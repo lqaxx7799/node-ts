@@ -178,5 +178,10 @@ const countConversation = () => Conversation.aggregate([
 
 export default {
   countConversation,
-  getByIds: (conversationIds: any[]) => conversationIds,
+  getByIds: (conversationIds: any[]) => {
+    return _.map(conversationIds, (item, index) => ({
+      _id: item,
+      assignedTo: index % 4,
+    }));
+  },
 }
