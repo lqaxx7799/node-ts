@@ -1,0 +1,97 @@
+events:
+
+{
+  name: FIRST_REPLY_WAITING_TIME | REPLY_WAITING_TIME | RESOLVE,
+  data: {
+    slaId,
+    minuteBreached,
+    conversationId,
+    assignedTo,
+    groupId,
+  },
+  createdAt,
+  appId,
+}
+
+{
+  name: SLA_BREACHED,
+  data: {
+    slaId,
+    conversationId,
+    type: FIRST_REPLY | REPLY | RESOLVE,
+  },
+  createdAt,
+  appId,
+}
+
+{
+  name: SLA_INIT,
+  data: {
+    slaId,
+    conversationId,
+  },
+  createdAt,
+  appId,
+}
+
+
+breachedByTime: [
+  {
+    match:
+      name = SLA_BREACHED,
+      appId,
+      from < createdAt < to,
+      slaId?,
+  },
+  { group: byDayOfWeek } // already handled
+]
+
+compliedByTime: [
+  { 
+    match:
+      name = FIRST_REPLY_WAITING_TIME | REPLY_WAITING_TIME | RESOLVE,
+      appId,
+      from < createdAt < to,
+      slaId?,
+  },
+  { addField: period }, // already handled
+  {
+    group:
+      _id: period, data.type,
+      compliance: $sum: (minuteBreached = 0 ? 1 : 0),
+      total: $sum: 1,  
+  },
+  {
+    project:
+      period,
+      type,
+      rate: total != 0 ? compliance/total : null, 
+  }
+]
+
+groupedByConversation: [
+  {
+    match:
+      name = SLA_INIT | FIRST_REPLY_WAITING_TIME | REPLY_WAITING_TIME | RESOLVE,
+      appId,
+      slaId?,
+      from < createdAt < to,
+  }
+  {
+    group:
+      _id: conversationId,
+      init: push if name = SLA_INIT,
+      first: push if name = FIRST_REPLY_WAITING_TIME,
+      next: push if name = REPLY_WAITING_TIME,
+      resolve: push if name = RESOLVE,
+  }
+  {
+    match:
+      (from < init.createdAt < to) || (init.createdAt < from && (resolve.createdAt > from || resolve.createdAt = null))
+  }
+  {
+    addField:
+      hit: first.minuteBreached = 0 && next.minuteBreached = 0 && resolve.minuteBreached = 0
+  }
+]
+

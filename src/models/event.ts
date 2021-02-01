@@ -101,12 +101,17 @@ const _fillPeriod = (data: any, from: any, to: any, period: any, defaultValue: a
   let fromPeriod = moment(from, DEFAULT_TIMEZONE);
   const toPeriod = moment(to, DEFAULT_TIMEZONE);
 
+  const result: any = {};
+
   let maxLoop = 2000;
   while (fromPeriod.isBefore(toPeriod)) {
     const key = fromPeriod.format(momentPeriodFormat);
-    if (!data[key]) {
-      data[key] = _.cloneDeep(defaultValue);
-    }
+    // if (!data[key]) {
+    //   result[key] = _.cloneDeep(defaultValue);
+    // } else {
+    //   result
+    // }
+    result[key] = data[key] || _.cloneDeep(defaultValue);
     fromPeriod = fromPeriod.add(1, period).startOf(period);
 
     maxLoop -= 1;
@@ -114,7 +119,7 @@ const _fillPeriod = (data: any, from: any, to: any, period: any, defaultValue: a
       break;
     }
   }
-  return data;
+  return result;
 }
 
 const _getEventAggregation = (from: any, to: any, slaId: any, periodFormat: any) => Event.aggregate([
@@ -318,10 +323,14 @@ const getReport = async (
 
   const general = _calculateGeneralReport(byConversation);
   const generalPast = _calculateGeneralReport(byConversationPast);
-  const groupedByCompliance = _groupByCompliance(byCompliance);
+  const groupedByCompliance = _fillPeriod(_groupByCompliance(byCompliance), from, to, period, {
+    SLA_NEXT: 0,
+    SLA_RESOVLED: 0,
+    SLA_FIRST: 0,
+  });
   const byAgent = _calculateByAgentReport(byConversation);
-  const byPerformance = _calculateByPerformanceReport(byConversation);
-  const byPerformancePast = _calculateByPerformanceReport(byConversationPast);
+  const byPerformance = slaId ? _calculateByPerformanceReport(byConversation) : null;
+  const byPerformancePast = slaId ? _calculateByPerformanceReport(byConversationPast) : null;
 
   return {
     general,
@@ -424,7 +433,16 @@ const _calculateByAgentReport = (byConversation: any) => {
 }
 
 const _groupByCompliance = (byCompliance: any) => {
-  return byCompliance;
+  return _(byCompliance)
+    .groupBy(item => item.period)
+    .mapValues(item => {
+      return _(item)
+        .reject(i => i.type === 'SLA_INIT')
+        .keyBy(i => i.type)
+        .mapValues(i => i.rate)
+        .value();
+    })
+    .value();
 }
 
 export default {
