@@ -323,6 +323,7 @@ const getReport = async (
 
   const general = _calculateGeneralReport(byConversation);
   const generalPast = _calculateGeneralReport(byConversationPast);
+  const byTime = _calculateByTimeReport(byConversation, from, to, period);
   const groupedByCompliance = _fillPeriod(_groupByCompliance(byCompliance), from, to, period, {
     SLA_NEXT: 0,
     SLA_RESOVLED: 0,
@@ -335,7 +336,7 @@ const getReport = async (
   return {
     general,
     generalPast,
-    // byTime,
+    byTime,
     byCompliance: groupedByCompliance,
     byDayOfWeek,
     byAgent,
@@ -443,6 +444,38 @@ const _groupByCompliance = (byCompliance: any) => {
         .value();
     })
     .value();
+}
+
+const _calculateByTimeReport = (byConversation: any, from: any, to: any, period: any) => {
+  const data = _fillPeriod({}, from, to, period, {
+    breached: 0,
+    complied: 0,
+  });
+
+  _(byConversation)
+    .forEach(item => {
+      const fromPeriod = item.init.data.eventAt;
+      const toPeriod = item.resolved ? item.resolved.data.eventAt : null;
+      const tempData = _fillPeriod({}, fromPeriod, toPeriod, period, {
+        breached: 0,
+        complied: 0,
+      });
+      _.forEach(Object.keys(tempData), key => {
+        // check for other period type
+        console.log(11111, item.first.data.eventAt, key);
+        const hasBreachedFirst = item.first.data.eventAt === key && !item.first.data.minuteBreached;
+        const hasBreachedNext = !!_.find(item.nexts, next => next.data.eventAt === key && !next.data.minuteBreached);
+        const hasBreachedResolved = !item.resolved ? true : item.resolved.data.eventAt === key && !item.resolved.data.minuteBreached;
+        const hasBreached = hasBreachedFirst && hasBreachedNext && hasBreachedResolved;
+
+        data[key] = {
+          breached: hasBreached ? data[key].breached + 1 : data[key].breached,
+          complied: hasBreached ? data[key].complied : data[key].complied + 1,
+        };
+      });
+    });
+
+  return data;
 }
 
 export default {
